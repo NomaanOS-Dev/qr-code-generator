@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
+import { NuqsAdapter } from 'nuqs/adapters/next/app'
 import { createClient } from '@/lib/supabase/server'
-import { DashboardSidebar } from '../../components/dashboard/sidebar'
+import { DashboardSidebar } from '@/components/dashboard/sidebar'
 import { DashboardHeader } from '@/components/dashboard/header'
 
 export default async function DashboardLayout({
@@ -17,7 +18,6 @@ export default async function DashboardLayout({
     redirect('/login')
   }
 
-  // Fetch profile + subscription
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
@@ -28,23 +28,25 @@ export default async function DashboardLayout({
     .from('subscriptions')
     .select('*')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
   return (
-    <div className="min-h-screen flex bg-muted/30">
-      <DashboardSidebar
-        user={user}
-        profile={profile}
-        plan={subscription?.plan ?? 'free'}
-      />
-      <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader
+    <NuqsAdapter>
+      <div className="min-h-screen flex bg-muted/30">
+        <DashboardSidebar
           user={user}
           profile={profile}
           plan={subscription?.plan ?? 'free'}
         />
-        <main className="flex-1 p-6 overflow-x-hidden">{children}</main>
+        <div className="flex-1 flex flex-col min-w-0">
+          <DashboardHeader
+            user={user}
+            profile={profile}
+            plan={subscription?.plan ?? 'free'}
+          />
+          <main className="flex-1 p-6 overflow-x-hidden">{children}</main>
+        </div>
       </div>
-    </div>
+    </NuqsAdapter>
   )
 }

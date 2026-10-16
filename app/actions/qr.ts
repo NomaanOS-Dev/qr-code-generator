@@ -18,8 +18,10 @@ export async function createQrCode(formData: FormData) {
 
   const name = (formData.get('name') as string)?.trim()
   const destinationUrl = (formData.get('destination_url') as string)?.trim()
-  const foregroundColor = (formData.get('foreground_color') as string) || '#000000'
-  const backgroundColor = (formData.get('background_color') as string) || '#FFFFFF'
+  const foregroundColor =
+    (formData.get('foreground_color') as string) || '#000000'
+  const backgroundColor =
+    (formData.get('background_color') as string) || '#FFFFFF'
   const logoPath = (formData.get('logo_path') as string) || null
 
   if (!name || name.length < 2) {
@@ -35,7 +37,6 @@ export async function createQrCode(formData: FormData) {
     return { error: validation.reason }
   }
 
-  // Plan limits
   const { data: subscription } = await supabase
     .from('subscriptions')
     .select('plan')
@@ -91,9 +92,8 @@ export async function updateQrCode(
 
   if (!user) return { error: 'Not authenticated' }
 
-  // Validate destination URL if provided
-  if (updates.destination_url) {
-    const validation = validateDestinationUrl(updates.destination_url)
+  if (updates.destination_url !== undefined) {
+    const validation = validateDestinationUrl(updates.destination_url.trim())
     if (!validation.valid) {
       return { error: validation.reason }
     }
@@ -103,8 +103,15 @@ export async function updateQrCode(
     return { error: 'Name must be at least 2 characters' }
   }
 
-  const payload: Record<string, unknown> = {}
-  if (updates.name !== undefined) payload.name = updates.name.trim()
+  const payload: {
+    name?: string
+    destination_url?: string
+  } = {}
+
+  if (updates.name !== undefined) {
+    payload.name = updates.name.trim()
+  }
+
   if (updates.destination_url !== undefined) {
     payload.destination_url = updates.destination_url.trim()
   }
@@ -151,7 +158,6 @@ export async function deleteQrCode(id: string) {
 
   if (!user) return { error: 'Not authenticated' }
 
-  // Fetch logo path to clean up storage
   const { data: qr } = await supabase
     .from('qr_codes')
     .select('logo_path')

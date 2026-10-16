@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef, useMemo } from 'react'
+import { useState, useTransition, useRef, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createQrCode } from '@/app/actions/qr'
 import { QrPreview } from './qr-preview'
@@ -10,39 +10,48 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Loader2, Download, Save, Link2, Palette, Image as ImageIcon } from 'lucide-react'
+import { Loader2, Download, Save, Link2, Palette } from 'lucide-react'
 import { downloadPng, downloadSvg, safeFilename } from '@/lib/qr-download'
-import { createClient } from '@/lib/supabase/client'
 
 interface CreateQrFormProps {
   userPlan?: string
+  preset?: {
+    name: string
+    destination: string
+    fg: string
+    bg: string
+  }
 }
 
-export function CreateQrForm({ userPlan = 'free' }: CreateQrFormProps) {
+export function CreateQrForm({ userPlan = 'free', preset }: CreateQrFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
-  // Form state
-  const [name, setName] = useState('')
-  const [destinationUrl, setDestinationUrl] = useState('')
-  const [foregroundColor, setForegroundColor] = useState('#000000')
-  const [backgroundColor, setBackgroundColor] = useState('#FFFFFF')
+  const [name, setName] = useState(preset?.name ?? '')
+  const [destinationUrl, setDestinationUrl] = useState(preset?.destination ?? '')
+  const [foregroundColor, setForegroundColor] = useState(preset?.fg ?? '#000000')
+  const [backgroundColor, setBackgroundColor] = useState(preset?.bg ?? '#FFFFFF')
   const [logoUrl, setLogoUrl] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState('content')
 
-  // For downloads and after-save reuse
+  // Sync when preset changes
+  useEffect(() => {
+    if (preset) {
+      setName(preset.name)
+      setDestinationUrl(preset.destination)
+      setForegroundColor(preset.fg)
+      setBackgroundColor(preset.bg)
+    }
+  }, [preset])
+
   const previewRef = useRef<SVGSVGElement>(null)
 
-  // Compute the redirect URL that will be encoded
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const [previewSlug] = useState(() =>
     Math.random().toString(36).slice(2, 10).padEnd(8, '0')
   )
   const previewUrl = `${appUrl}/r/${previewSlug}`
 
-  // Live preview value
   const previewValue = useMemo(() => {
     return destinationUrl.trim() ? previewUrl : ''
   }, [destinationUrl, previewUrl])
@@ -77,13 +86,10 @@ export function CreateQrForm({ userPlan = 'free' }: CreateQrFormProps) {
 
     if (!name.trim()) {
       toast.error('Please enter a name')
-      setActiveTab('content')
       return
     }
-
     if (!destinationUrl.trim()) {
       toast.error('Please enter a destination URL')
-      setActiveTab('content')
       return
     }
 
@@ -96,12 +102,10 @@ export function CreateQrForm({ userPlan = 'free' }: CreateQrFormProps) {
 
     startTransition(async () => {
       const result = await createQrCode(formData)
-
       if (result.error) {
         toast.error(result.error)
         return
       }
-
       toast.success('QR code created')
       router.push(`/dashboard/${result.id}`)
     })
@@ -110,7 +114,6 @@ export function CreateQrForm({ userPlan = 'free' }: CreateQrFormProps) {
   return (
     <form onSubmit={handleSubmit}>
       <div className="grid lg:grid-cols-[1fr_400px] gap-6">
-        {/* LEFT: Form fields */}
         <div className="space-y-6">
           <Card>
             <CardHeader>
@@ -132,9 +135,6 @@ export function CreateQrForm({ userPlan = 'free' }: CreateQrFormProps) {
                   maxLength={100}
                   required
                 />
-                <p className="text-xs text-muted-foreground">
-                  Only you see this — helps organize your codes.
-                </p>
               </div>
 
               <div className="space-y-2">
@@ -184,7 +184,6 @@ export function CreateQrForm({ userPlan = 'free' }: CreateQrFormProps) {
           </Card>
         </div>
 
-        {/* RIGHT: Live preview + actions */}
         <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
           <Card>
             <CardHeader>
@@ -207,9 +206,7 @@ export function CreateQrForm({ userPlan = 'free' }: CreateQrFormProps) {
                   <p className="text-xs font-medium text-muted-foreground">
                     Encoded URL
                   </p>
-                  <p className="text-xs font-mono break-all">
-                    {previewUrl}
-                  </p>
+                  <p className="text-xs font-mono break-all">{previewUrl}</p>
                 </div>
               )}
 

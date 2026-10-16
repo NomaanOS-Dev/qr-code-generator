@@ -150,10 +150,8 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/dashboard">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+        <Button variant="ghost" size="icon" render={<Link href="/dashboard" />}>
+          <ArrowLeft className="h-4 w-4" />
         </Button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -166,11 +164,9 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
             Created {formatDistanceToNow(new Date(qrCode.created_at), { addSuffix: true })}
           </p>
         </div>
-        <Button variant="outline" asChild>
-          <Link href={`/dashboard/${qrCode.id}/analytics`}>
-            <BarChart3 className="h-4 w-4 mr-2" />
-            Analytics
-          </Link>
+        <Button variant="outline" render={<Link href={`/dashboard/${qrCode.id}/analytics`} />}>
+          <BarChart3 className="h-4 w-4 mr-2" />
+          Analytics
         </Button>
       </div>
 
@@ -378,12 +374,14 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
                   </p>
                 </div>
                 <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-                  <DialogTrigger asChild>
+                  <DialogTrigger
+                  render={
                     <Button variant="destructive" size="sm">
                       <Trash2 className="h-4 w-4 mr-2" />
                       Delete
                     </Button>
-                  </DialogTrigger>
+                  }
+                />
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Delete "{qrCode.name}"?</DialogTitle>
