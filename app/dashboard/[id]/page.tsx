@@ -13,7 +13,6 @@ export const metadata = {
 export default async function QrDetailPage({ params }: PageProps) {
   const { id } = await params
   const supabase = await createClient()
-
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -32,6 +31,10 @@ export default async function QrDetailPage({ params }: PageProps) {
       logo_path,
       is_active,
       created_at,
+      margin,
+      error_correction,
+      logo_size_percent,
+      style,
       qr_scans (count)
     `)
     .eq('id', id)
@@ -51,10 +54,6 @@ export default async function QrDetailPage({ params }: PageProps) {
     <QrDetailView
       qrCode={{
         ...qrCode,
-        foreground_color: qrCode.foreground_color ?? '#000000',
-        background_color: qrCode.background_color ?? '#FFFFFF',
-        is_active: qrCode.is_active ?? true,
-        created_at: qrCode.created_at ?? new Date().toISOString(),
         scanCount,
       }}
       appUrl={appUrl}

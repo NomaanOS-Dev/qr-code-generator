@@ -43,36 +43,51 @@ export type Database = {
           background_color: string | null
           created_at: string | null
           destination_url: string
+          error_correction: string | null
           foreground_color: string | null
           id: string
           is_active: boolean | null
           logo_path: string | null
+          logo_size_percent: number | null
+          margin: number | null
           name: string
+          size: number | null
           slug: string
+          style: string | null
           user_id: string
         }
         Insert: {
           background_color?: string | null
           created_at?: string | null
           destination_url: string
+          error_correction?: string | null
           foreground_color?: string | null
           id?: string
           is_active?: boolean | null
           logo_path?: string | null
+          logo_size_percent?: number | null
+          margin?: number | null
           name: string
+          size?: number | null
           slug: string
+          style?: string | null
           user_id: string
         }
         Update: {
           background_color?: string | null
           created_at?: string | null
           destination_url?: string
+          error_correction?: string | null
           foreground_color?: string | null
           id?: string
           is_active?: boolean | null
           logo_path?: string | null
+          logo_size_percent?: number | null
+          margin?: number | null
           name?: string
+          size?: number | null
           slug?: string
+          style?: string | null
           user_id?: string
         }
         Relationships: [

@@ -6,13 +6,39 @@ import { createQrCode } from '@/app/actions/qr'
 import { QrPreview } from './qr-preview'
 import { ColorPicker } from './color-picker'
 import { LogoUpload } from './logo-upload'
+import { StylePicker } from './style-picker'
+import { DownloadMenu } from './download-menu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
-import { Loader2, Download, Save, Link2, Palette } from 'lucide-react'
-import { downloadPng, downloadSvg, safeFilename } from '@/lib/qr-download'
+import {
+  Loader2,
+  Save,
+  Link2,
+  Palette,
+  Settings2,
+  Sparkles,
+} from 'lucide-react'
+import { safeFilename } from '@/lib/qr-download'
+import {
+  ERROR_CORRECTION_LEVELS,
+  type QrStylePreset,
+} from '@/lib/qr-styles'
 
 interface CreateQrFormProps {
   userPlan?: string
@@ -28,13 +54,26 @@ export function CreateQrForm({ userPlan = 'free', preset }: CreateQrFormProps) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
 
+  // Content
   const [name, setName] = useState(preset?.name ?? '')
   const [destinationUrl, setDestinationUrl] = useState(preset?.destination ?? '')
+
+  // Appearance
+  const [style, setStyle] = useState<string>('default')
   const [foregroundColor, setForegroundColor] = useState(preset?.fg ?? '#000000')
   const [backgroundColor, setBackgroundColor] = useState(preset?.bg ?? '#FFFFFF')
-  const [logoUrl, setLogoUrl] = useState<string | null>(null)
 
-  // Sync when preset changes
+  // Logo
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [logoSizePercent, setLogoSizePercent] = useState(20)
+
+  // Advanced
+  const [margin, setMargin] = useState(4)
+  const [errorCorrection, setErrorCorrection] = useState<'L' | 'M' | 'Q' | 'H'>('H')
+
+  const previewRef = useRef<SVGSVGElement>(null)
+
+  // Apply preset on mount
   useEffect(() => {
     if (preset) {
       setName(preset.name)
@@ -43,8 +82,6 @@ export function CreateQrForm({ userPlan = 'free', preset }: CreateQrFormProps) {
       setBackgroundColor(preset.bg)
     }
   }, [preset])
-
-  const previewRef = useRef<SVGSVGElement>(null)
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const [previewSlug] = useState(() =>
@@ -56,28 +93,15 @@ export function CreateQrForm({ userPlan = 'free', preset }: CreateQrFormProps) {
     return destinationUrl.trim() ? previewUrl : ''
   }, [destinationUrl, previewUrl])
 
-  function handleDownloadPng() {
-    if (!previewRef.current) return
-    if (!destinationUrl.trim()) {
-      toast.error('Enter a destination URL first')
-      return
-    }
-    downloadPng(previewRef.current, safeFilename(name || 'qr-code'))
-      .then(() => toast.success('PNG downloaded'))
-      .catch((err) => toast.error(err.message))
-  }
-
-  function handleDownloadSvg() {
-    if (!previewRef.current) return
-    if (!destinationUrl.trim()) {
-      toast.error('Enter a destination URL first')
-      return
-    }
-    try {
-      downloadSvg(previewRef.current, safeFilename(name || 'qr-code'))
-      toast.success('SVG downloaded')
-    } catch (err) {
-      toast.error((err as Error).message)
+  // Handle style change — updates colors + advanced
+  function handleStyleChange(preset: QrStylePreset) {
+    setStyle(preset.id)
+    setForegroundColor(preset.foregroundColor)
+    setBackgroundColor(preset.backgroundColor)
+    setMargin(preset.margin)
+    setErrorCorrection(preset.errorCorrection)
+    if (preset.logoSizePercent !== undefined) {
+      setLogoSizePercent(preset.logoSizePercent)
     }
   }
 
@@ -98,6 +122,10 @@ export function CreateQrForm({ userPlan = 'free', preset }: CreateQrFormProps) {
     formData.append('destination_url', destinationUrl.trim())
     formData.append('foreground_color', foregroundColor)
     formData.append('background_color', backgroundColor)
+    formData.append('margin', String(margin))
+    formData.append('error_correction', errorCorrection)
+    formData.append('logo_size_percent', String(logoSizePercent))
+    formData.append('style', style)
     if (logoUrl) formData.append('logo_path', logoUrl)
 
     startTransition(async () => {
@@ -115,11 +143,12 @@ export function CreateQrForm({ userPlan = 'free', preset }: CreateQrFormProps) {
     <form onSubmit={handleSubmit}>
       <div className="grid lg:grid-cols-[1fr_400px] gap-6">
         <div className="space-y-6">
+          {/* Content card */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Link2 className="h-4 w-4" />
-                QR Code Details
+                Content
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -156,6 +185,7 @@ export function CreateQrForm({ userPlan = 'free', preset }: CreateQrFormProps) {
             </CardContent>
           </Card>
 
+          {/* Appearance card with tabs */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -163,27 +193,108 @@ export function CreateQrForm({ userPlan = 'free', preset }: CreateQrFormProps) {
                 Appearance
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid sm:grid-cols-2 gap-4">
-                <ColorPicker
-                  id="foreground_color"
-                  label="Foreground color"
-                  value={foregroundColor}
-                  onChange={setForegroundColor}
-                />
-                <ColorPicker
-                  id="background_color"
-                  label="Background color"
-                  value={backgroundColor}
-                  onChange={setBackgroundColor}
-                />
-              </div>
+            <CardContent>
+              <Tabs defaultValue="presets" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="presets">
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                    Presets
+                  </TabsTrigger>
+                  <TabsTrigger value="colors">Colors</TabsTrigger>
+                  <TabsTrigger value="advanced">
+                    <Settings2 className="h-3.5 w-3.5 mr-1.5" />
+                    Advanced
+                  </TabsTrigger>
+                </TabsList>
 
-              <LogoUpload value={logoUrl} onChange={setLogoUrl} />
+                <TabsContent value="presets" className="mt-4">
+                  <StylePicker value={style} onChange={handleStyleChange} />
+                </TabsContent>
+
+                <TabsContent value="colors" className="mt-4 space-y-6">
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <ColorPicker
+                      id="foreground_color"
+                      label="Foreground color"
+                      value={foregroundColor}
+                      onChange={setForegroundColor}
+                    />
+                    <ColorPicker
+                      id="background_color"
+                      label="Background color"
+                      value={backgroundColor}
+                      onChange={setBackgroundColor}
+                    />
+                  </div>
+
+                  <LogoUpload
+                    value={logoUrl}
+                    onChange={setLogoUrl}
+                    sizePercent={logoSizePercent}
+                    onSizeChange={setLogoSizePercent}
+                    showSizeSlider
+                  />
+                </TabsContent>
+
+                <TabsContent value="advanced" className="mt-4 space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="error-correction">
+                      Error correction level
+                    </Label>
+                    <Select
+                      value={errorCorrection}
+                      onValueChange={(v) =>
+                        setErrorCorrection(v as 'L' | 'M' | 'Q' | 'H')
+                      }
+                    >
+                      <SelectTrigger id="error-correction">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ERROR_CORRECTION_LEVELS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            <div className="flex flex-col">
+                              <span>{opt.label}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {opt.description}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Higher correction = more resilient but denser QR code.
+                      Use High (H) if you have a logo.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="margin">
+                      Quiet zone margin: {margin}
+                    </Label>
+                    <input
+                      id="margin"
+                      type="range"
+                      min={0}
+                      max={10}
+                      step={1}
+                      value={margin}
+                      onChange={(e) => setMargin(Number(e.target.value))}
+                      className="w-full accent-primary"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Space around the QR code. 4 is standard. Increase for
+                      scan reliability when placing on busy backgrounds.
+                    </p>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </CardContent>
           </Card>
         </div>
 
+        {/* Right column — preview */}
         <div className="space-y-4 lg:sticky lg:top-24 lg:self-start">
           <Card>
             <CardHeader>
@@ -198,6 +309,9 @@ export function CreateQrForm({ userPlan = 'free', preset }: CreateQrFormProps) {
                   backgroundColor={backgroundColor}
                   logoUrl={logoUrl}
                   size={256}
+                  marginSize={margin}
+                  errorCorrectionLevel={errorCorrection}
+                  logoSizePercent={logoSizePercent}
                 />
               </div>
 
@@ -210,28 +324,17 @@ export function CreateQrForm({ userPlan = 'free', preset }: CreateQrFormProps) {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadPng}
-                  disabled={!previewValue}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  PNG
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownloadSvg}
-                  disabled={!previewValue}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  SVG
-                </Button>
-              </div>
+              <DownloadMenu
+                svgRef={previewRef}
+                filename={safeFilename(name || 'qr-code')}
+                qrName={name || 'Untitled QR Code'}
+                shortUrl={previewUrl}
+                destinationUrl={destinationUrl || 'https://example.com'}
+                variant="outline"
+                size="default"
+                className="w-full"
+                showPdf={Boolean(previewValue)}
+              />
             </CardContent>
           </Card>
 

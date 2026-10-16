@@ -9,7 +9,9 @@ interface QrPreviewProps {
   backgroundColor: string
   logoUrl?: string | null
   size?: number
+  marginSize?: number
   errorCorrectionLevel?: 'L' | 'M' | 'Q' | 'H'
+  logoSizePercent?: number
 }
 
 export const QrPreview = forwardRef<SVGSVGElement, QrPreviewProps>(
@@ -20,7 +22,9 @@ export const QrPreview = forwardRef<SVGSVGElement, QrPreviewProps>(
       backgroundColor,
       logoUrl,
       size = 256,
-      errorCorrectionLevel = 'H', // High error correction — needed for logos
+      marginSize = 4,
+      errorCorrectionLevel = 'H',
+      logoSizePercent = 20,
     },
     ref
   ) {
@@ -34,6 +38,8 @@ export const QrPreview = forwardRef<SVGSVGElement, QrPreviewProps>(
         </div>
       )
     }
+
+    const logoPixels = Math.round((size * logoSizePercent) / 100)
 
     return (
       <div
@@ -51,14 +57,14 @@ export const QrPreview = forwardRef<SVGSVGElement, QrPreviewProps>(
           fgColor={foregroundColor}
           bgColor={backgroundColor}
           level={errorCorrectionLevel}
-          marginSize={4}
+          marginSize={marginSize}
           imageSettings={
             logoUrl
               ? {
                   src: logoUrl,
-                  height: size * 0.2, // 20% of QR size
-                  width: size * 0.2,
-                  excavate: true, // Clear the modules behind the logo
+                  height: logoPixels,
+                  width: logoPixels,
+                  excavate: true,
                 }
               : undefined
           }

@@ -2,23 +2,34 @@
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Power, PowerOff, Trash2, X, Loader2 } from 'lucide-react'
+import {
+  Power,
+  PowerOff,
+  Trash2,
+  X,
+  Loader2,
+  Download,
+} from 'lucide-react'
 
 interface BulkActionsBarProps {
   count: number
   isPending: boolean
+  isZipping?: boolean
   onActivate: () => void
   onDeactivate: () => void
   onDelete: () => void
+  onDownloadZip: () => void
   onClear: () => void
 }
 
 export function BulkActionsBar({
   count,
   isPending,
+  isZipping = false,
   onActivate,
   onDeactivate,
   onDelete,
+  onDownloadZip,
   onClear,
 }: BulkActionsBarProps) {
   if (count === 0) return null
@@ -35,15 +46,26 @@ export function BulkActionsBar({
         <Button
           variant="ghost"
           size="sm"
+          onClick={onDownloadZip}
+          disabled={isPending || isZipping}
+          className="rounded-full"
+        >
+          {isZipping ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Download className="h-4 w-4 mr-2" />
+          )}
+          ZIP
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={onActivate}
           disabled={isPending}
           className="rounded-full"
         >
-          {isPending ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Power className="h-4 w-4 mr-2" />
-          )}
+          <Power className="h-4 w-4 mr-2" />
           Activate
         </Button>
 
@@ -76,7 +98,7 @@ export function BulkActionsBar({
           size="icon"
           onClick={onClear}
           className="rounded-full h-8 w-8"
-          disabled={isPending}
+          disabled={isPending || isZipping}
         >
           <X className="h-4 w-4" />
         </Button>

@@ -14,18 +14,15 @@ export function downloadSvg(svgElement: SVGSVGElement, filename: string) {
 }
 
 /**
- * Download an SVG element as a PNG file at the given size.
- * Uses canvas to rasterize.
+ * Convert SVG element to a PNG data URL.
  */
-export async function downloadPng(
+export async function svgToPngDataUrl(
   svgElement: SVGSVGElement,
-  filename: string,
   size: number = 1024
-) {
+): Promise<string> {
   const serializer = new XMLSerializer()
   const svgString = serializer.serializeToString(svgElement)
 
-  // Create an image from the SVG string
   const svgBlob = new Blob([svgString], {
     type: 'image/svg+xml;charset=utf-8',
   })
@@ -40,7 +37,6 @@ export async function downloadPng(
     img.src = url
   })
 
-  // Draw to canvas at target size
   const canvas = document.createElement('canvas')
   canvas.width = size
   canvas.height = size
@@ -51,22 +47,29 @@ export async function downloadPng(
     throw new Error('Canvas not supported')
   }
 
-  // White background (so transparent SVGs don't come out transparent)
+  // White background
   ctx.fillStyle = '#FFFFFF'
   ctx.fillRect(0, 0, size, size)
-
   ctx.drawImage(img, 0, 0, size, size)
 
   URL.revokeObjectURL(url)
 
-  // Convert canvas to blob
-  const blob = await new Promise<Blob | null>((resolve) => {
-    canvas.toBlob(resolve, 'image/png', 1.0)
-  })
+  return canvas.toDataURL('image/png')
+}
 
-  if (!blob) {
-    throw new Error('Failed to create PNG')
-  }
+/**
+ * Download an SVG element as a PNG file at the given size.
+ */
+export async function downloadPng(
+  svgElement: SVGSVGElement,
+  filename: string,
+  size: number = 1024
+) {
+  const dataUrl = await svgToPngDataUrl(svgElement, size)
+
+  // Convert data URL to blob
+  const res = await fetch(dataUrl)
+  const blob = await res.blob()
 
   triggerDownload(blob, `${filename}.png`)
 }
@@ -74,7 +77,7 @@ export async function downloadPng(
 /**
  * Internal helper — triggers a browser download of a blob.
  */
-function triggerDownload(blob: Blob, filename: string) {
+export function triggerDownload(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')
   link.href = url
