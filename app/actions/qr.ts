@@ -16,7 +16,6 @@ export async function createQrCode(formData: FormData) {
     return { error: 'You must be logged in' }
   }
 
-  // 1. Validate input
   const name = (formData.get('name') as string)?.trim()
   const destinationUrl = (formData.get('destination_url') as string)?.trim()
   const foregroundColor = (formData.get('foreground_color') as string) || '#000000'
@@ -36,12 +35,12 @@ export async function createQrCode(formData: FormData) {
     return { error: validation.reason }
   }
 
-  // 2. Check plan limits
+  // Plan limits
   const { data: subscription } = await supabase
     .from('subscriptions')
-    .select('plan, status')
+    .select('plan')
     .eq('user_id', user.id)
-    .single()
+    .maybeSingle()
 
   const plan: Plan = (subscription?.plan as Plan) || 'free'
   const limits = PLAN_LIMITS[plan]
@@ -57,10 +56,8 @@ export async function createQrCode(formData: FormData) {
     }
   }
 
-  // 3. Generate unique slug
   const slug = nanoid(8)
 
-  // 4. Insert
   const { data, error } = await supabase
     .from('qr_codes')
     .insert({
@@ -81,4 +78,102 @@ export async function createQrCode(formData: FormData) {
 
   revalidatePath('/dashboard')
   return { success: true, id: data.id, slug: data.slug }
+}
+
+export async function updateQrCode(
+  id: string,
+  updates: { name?: string; destination_url?: string }
+) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Not authenticated' }
+
+  // Validate destination URL if provided
+  if (updates.destination_url) {
+    const validation = validateDestinationUrl(updates.destination_url)
+    if (!validation.valid) {
+      return { error: validation.reason }
+    }
+  }
+
+  if (updates.name !== undefined && updates.name.trim().length < 2) {
+    return { error: 'Name must be at least 2 characters' }
+  }
+
+  const payload: Record<string, unknown> = {}
+  if (updates.name !== undefined) payload.name = updates.name.trim()
+  if (updates.destination_url !== undefined) {
+    payload.destination_url = updates.destination_url.trim()
+  }
+
+  const { error } = await supabase
+    .from('qr_codes')
+    .update(payload)
+    .eq('id', id)
+    .eq('user_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/dashboard/${id}`)
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+export async function toggleQrCodeActive(id: string, isActive: boolean) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('qr_codes')
+    .update({ is_active: isActive })
+    .eq('id', id)
+    .eq('user_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath(`/dashboard/${id}`)
+  revalidatePath('/dashboard')
+  return { success: true }
+}
+
+export async function deleteQrCode(id: string) {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return { error: 'Not authenticated' }
+
+  // Fetch logo path to clean up storage
+  const { data: qr } = await supabase
+    .from('qr_codes')
+    .select('logo_path')
+    .eq('id', id)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (qr?.logo_path) {
+    const path = qr.logo_path.split('/qr-logos/')[1]
+    if (path) {
+      await supabase.storage.from('qr-logos').remove([path])
+    }
+  }
+
+  const { error } = await supabase
+    .from('qr_codes')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', user.id)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/dashboard')
+  return { success: true }
 }
