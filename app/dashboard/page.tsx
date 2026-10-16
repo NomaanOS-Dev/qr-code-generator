@@ -22,7 +22,7 @@ export default async function DashboardPage() {
             Manage all your dynamic QR codes in one place
           </p>
         </div>
-        <Button asChild>
+        <Button render={<Link href="/dashboard/create" />}>
           <Link href="/dashboard/create">
             <Plus className="h-4 w-4 mr-2" />
             Create QR
@@ -39,7 +39,7 @@ export default async function DashboardPage() {
           <p className="text-sm text-muted-foreground mb-4">
             Create your first dynamic QR code to get started.
           </p>
-          <Button asChild>
+          <Button render={<Link href="/dashboard/create" />}>
             <Link href="/dashboard/create">
               <Plus className="h-4 w-4 mr-2" />
               Create your first QR code

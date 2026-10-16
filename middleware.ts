@@ -29,8 +29,6 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // IMPORTANT: Do not run code between createServerClient and supabase.auth.getUser()
-  // A simple mistake could make it very hard to debug session issues
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -38,16 +36,15 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   const isDashboard = pathname.startsWith('/dashboard')
-  const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/signup')
+  const isAuthPage =
+    pathname.startsWith('/login') || pathname.startsWith('/signup')
 
-  // Redirect logged-in users away from auth pages
   if (isAuthPage && user) {
     const url = request.nextUrl.clone()
     url.pathname = '/dashboard'
     return NextResponse.redirect(url)
   }
 
-  // Redirect unauthenticated users to login
   if (isDashboard && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
@@ -60,15 +57,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (public folder)
-     * - r/ (redirect routes — must not require auth)
-     * - api/ (API routes handle their own auth)
-     */
     '/((?!_next/static|_next/image|favicon.ico|r/|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

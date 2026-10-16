@@ -50,7 +50,7 @@ export function DashboardHeader({ user, profile, plan }: HeaderProps) {
       {/* Mobile menu */}
       <div className="md:hidden">
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger asChild>
+          <SheetTrigger render={<Link href="/dashboard/create" />}>
             <Button variant="ghost" size="icon">
               <Menu className="h-5 w-5" />
             </Button>
@@ -118,7 +118,7 @@ export function DashboardHeader({ user, profile, plan }: HeaderProps) {
 
       {/* Right side */}
       <div className="flex items-center gap-2 ml-auto">
-        <Button asChild size="sm">
+        <Button render={<Link href="/dashboard/create" />} size="sm">
           <Link href="/dashboard/create">
             <Plus className="h-4 w-4 mr-1" />
             Create QR
