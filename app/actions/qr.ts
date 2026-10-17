@@ -7,7 +7,14 @@ import { validateDestinationUrl } from '@/lib/validate-url'
 import { PLAN_LIMITS, type Plan } from '@/lib/plans'
 
 const VALID_ERROR_LEVELS = ['L', 'M', 'Q', 'H'] as const
-const VALID_STYLES = ['default', 'bold', 'minimal', 'rounded', 'dots', 'branded'] as const
+const VALID_STYLES = [
+  'default',
+  'bold',
+  'minimal',
+  'rounded',
+  'dots',
+  'branded',
+] as const
 
 export async function createQrCode(formData: FormData) {
   const supabase = await createClient()
@@ -44,8 +51,11 @@ export async function createQrCode(formData: FormData) {
     return { error: validation.reason }
   }
 
-  // Validate enum values
-  if (!VALID_ERROR_LEVELS.includes(errorCorrection as (typeof VALID_ERROR_LEVELS)[number])) {
+  if (
+    !VALID_ERROR_LEVELS.includes(
+      errorCorrection as (typeof VALID_ERROR_LEVELS)[number]
+    )
+  ) {
     return { error: 'Invalid error correction level' }
   }
 
@@ -53,7 +63,6 @@ export async function createQrCode(formData: FormData) {
     return { error: 'Invalid style' }
   }
 
-  // Validate numeric ranges
   if (!Number.isFinite(margin) || margin < 0 || margin > 10) {
     return { error: 'Margin must be between 0 and 10' }
   }
@@ -66,24 +75,39 @@ export async function createQrCode(formData: FormData) {
     return { error: 'Logo size must be between 10% and 30%' }
   }
 
-  // Plan limits
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('plan')
-    .eq('user_id', user.id)
-    .maybeSingle()
+  // 🔒 Plan guard
+  const { getPlanContext } = await import('@/lib/plan-guard')
+  const ctx = await getPlanContext()
+  if (!ctx) return { error: 'Not authenticated' }
 
-  const plan: Plan = (subscription?.plan as Plan) || 'free'
-  const limits = PLAN_LIMITS[plan]
-
-  const { count } = await supabase
-    .from('qr_codes')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-
-  if ((count ?? 0) >= limits.maxQrCodes) {
+  if (!ctx.canCreateQr) {
     return {
-      error: `You've reached the ${plan} plan limit (${limits.maxQrCodes} QR codes). Please upgrade to create more.`,
+      error: `You've reached the ${ctx.plan} plan limit (${ctx.limits.maxQrCodes} QR codes). Please upgrade to create more.`,
+    }
+  }
+
+  // 🔒 Feature gate: logo requires Starter+
+  if (logoPath && !ctx.limits.logoUpload) {
+    return {
+      error: 'Logo upload requires the Starter plan or higher.',
+    }
+  }
+
+  // 🔒 Workspace context
+  const { getCurrentWorkspace, canInWorkspace } = await import(
+    '@/lib/workspaces'
+  )
+  const workspace = await getCurrentWorkspace()
+
+  if (!workspace) {
+    return { error: 'No workspace found. Please create one first.' }
+  }
+
+  const canCreate = await canInWorkspace(workspace.id, 'create_qr')
+  if (!canCreate) {
+    return {
+      error:
+        'You do not have permission to create QR codes in this workspace',
     }
   }
 
@@ -93,6 +117,7 @@ export async function createQrCode(formData: FormData) {
     .from('qr_codes')
     .insert({
       user_id: user.id,
+      workspace_id: workspace.id,
       slug,
       name,
       destination_url: destinationUrl,
@@ -110,9 +135,13 @@ export async function createQrCode(formData: FormData) {
   if (error) return { error: error.message }
 
   revalidatePath('/dashboard')
+  revalidatePath(`/dashboard/workspaces/${workspace.id}`)
   return { success: true, id: data.id, slug: data.slug }
 }
 
+// ============================================================
+// Update: Only name + destination_url are editable
+// ============================================================
 export async function updateQrCode(
   id: string,
   updates: { name?: string; destination_url?: string }
@@ -133,7 +162,12 @@ export async function updateQrCode(
     return { error: 'Name must be at least 2 characters' }
   }
 
-  const payload: Record<string, unknown> = {}
+  // ✅ Explicitly typed — matches Supabase's Update type exactly
+  const payload: {
+    name?: string
+    destination_url?: string
+  } = {}
+
   if (updates.name !== undefined) payload.name = updates.name.trim()
   if (updates.destination_url !== undefined) {
     payload.destination_url = updates.destination_url.trim()
@@ -274,7 +308,9 @@ export async function getQrCodesForDownload(ids: string[]) {
 
   const { data, error } = await supabase
     .from('qr_codes')
-    .select('id, name, slug, foreground_color, background_color, logo_path, margin, error_correction, logo_size_percent')
+    .select(
+      'id, name, slug, foreground_color, background_color, logo_path, margin, error_correction, logo_size_percent'
+    )
     .in('id', ids)
     .eq('user_id', user.id)
 

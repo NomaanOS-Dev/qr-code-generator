@@ -264,21 +264,11 @@ export function QrCard({
         </Link>
 
         <div className="flex gap-2 pt-1">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            render={<Link href={`/dashboard/${qr.id}`} />}
-          >
-            View details
+          <Button variant="outline" size="sm" className="flex-1" asChild>
+            <Link href={`/dashboard/${qr.id}`}>View details</Link>
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex-1"
-            render={<Link href={`/dashboard/${qr.id}/analytics`} />}
-          >
-            Analytics
+          <Button variant="ghost" size="sm" className="flex-1" asChild>
+            <Link href={`/dashboard/${qr.id}/analytics`}>Analytics</Link>
           </Button>
         </div>
       </CardContent>

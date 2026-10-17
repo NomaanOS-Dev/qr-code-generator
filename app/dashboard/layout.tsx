@@ -1,22 +1,28 @@
 import { redirect } from 'next/navigation'
+import { connection } from 'next/server'
 import { NuqsAdapter } from 'nuqs/adapters/next/app'
 import { createClient } from '@/lib/supabase/server'
+import { getPlanContext } from '@/lib/plan-guard'
+import { getUserWorkspaces, getCurrentWorkspace } from '@/lib/workspaces'
 import { DashboardSidebar } from '@/components/dashboard/sidebar'
 import { DashboardHeader } from '@/components/dashboard/header'
+
+// ✅ REQUIRED for Next.js 16 + Cache Components when using `await connection()`
+export const instant = false
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  await connection()
+
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  if (!user) {
-    redirect('/login')
-  }
+  if (!user) redirect('/login')
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -24,11 +30,11 @@ export default async function DashboardLayout({
     .eq('id', user.id)
     .single()
 
-  const { data: subscription } = await supabase
-    .from('subscriptions')
-    .select('*')
-    .eq('user_id', user.id)
-    .maybeSingle()
+  const [ctx, workspaces, currentWorkspace] = await Promise.all([
+    getPlanContext(),
+    getUserWorkspaces(),
+    getCurrentWorkspace(),
+  ])
 
   return (
     <NuqsAdapter>
@@ -36,15 +42,23 @@ export default async function DashboardLayout({
         <DashboardSidebar
           user={user}
           profile={profile}
-          plan={subscription?.plan ?? 'free'}
+          plan={ctx?.plan ?? 'free'}
+          qrCodeCount={ctx?.qrCodeCount ?? 0}
+          qrCodeLimit={ctx?.limits.maxQrCodes ?? 0}
+          workspaces={workspaces}
+          activeWorkspaceId={currentWorkspace?.id ?? null}
         />
         <div className="flex-1 flex flex-col min-w-0">
           <DashboardHeader
             user={user}
             profile={profile}
-            plan={subscription?.plan ?? 'free'}
+            plan={ctx?.plan ?? 'free'}
+            workspaces={workspaces}
+            activeWorkspaceId={currentWorkspace?.id ?? null}
           />
-          <main className="flex-1 p-6 overflow-x-hidden">{children}</main>
+          <main className="flex-1 p-6 overflow-x-hidden" id="main-content">
+            {children}
+          </main>
         </div>
       </div>
     </NuqsAdapter>

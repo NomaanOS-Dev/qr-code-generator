@@ -1,10 +1,14 @@
 import { redirect } from 'next/navigation'
+import { connection } from 'next/server'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { CreateQrForm } from '@/components/qr/create-qr-form'
 import { Button } from '@/components/ui/button'
-import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import type { Plan } from '@/lib/plans'
+
+// ✅ REQUIRED for Next.js 16 + Cache Components when using `await connection()`
+export const instant = false
 
 export const metadata = {
   title: 'Create QR Code — ScanFlow',
@@ -57,6 +61,8 @@ interface PageProps {
 }
 
 export default async function CreateQrPage({ searchParams }: PageProps) {
+  await connection()
+
   const { template } = await searchParams
   const supabase = await createClient()
 
@@ -78,12 +84,10 @@ export default async function CreateQrPage({ searchParams }: PageProps) {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Button
-          variant="ghost"
-          size="icon"
-          render={<Link href="/dashboard" />}
-        >
-          <ArrowLeft className="h-4 w-4" />
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/dashboard" aria-label="Back to dashboard">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
         </Button>
         <div>
           <h1 className="text-3xl font-bold">Create QR Code</h1>

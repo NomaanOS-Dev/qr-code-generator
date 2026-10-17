@@ -11,6 +11,7 @@ import {
     parseAsStringEnum,
 } from 'nuqs'
 import { QrCard, type QrCardData } from '@/components/qr/qr-card'
+import { EmptyState } from '../ui/empty-state'
 import { QrToolbar, type QrStatus, type QrSort, type QrView } from './qr-toolbar'
 import { BulkActionsBar } from './bulk-actions-bar'
 import { Button } from '@/components/ui/button'
@@ -81,7 +82,19 @@ export function QrDashboardClient({ qrCodes, appUrl }: QrDashboardClientProps) {
                 return
             }
 
-            await downloadQrBatchAsZip(result.data, appUrl)
+            // Filter out nulls to match QrForZip type
+            const codesForZip = result.data.map((c) => ({
+                id: c.id,
+                name: c.name,
+                slug: c.slug,
+                foreground_color: c.foreground_color,
+                background_color: c.background_color,
+                logo_path: c.logo_path,
+                margin: c.margin,
+                error_correction: c.error_correction,
+                logo_size_percent: c.logo_size_percent,
+            }))
+            await downloadQrBatchAsZip(codesForZip, appUrl)
             toast.success(`Downloaded ${result.data.length} QR codes as ZIP`)
         } catch (err) {
             toast.error((err as Error).message)
@@ -278,7 +291,7 @@ export function QrDashboardClient({ qrCodes, appUrl }: QrDashboardClientProps) {
         })
     }
 
-    // --- Empty states ---
+    // --- Empty state: no QR codes at all ---
     if (qrCodes.length === 0) {
         return (
             <div className="space-y-6">
@@ -289,25 +302,23 @@ export function QrDashboardClient({ qrCodes, appUrl }: QrDashboardClientProps) {
                             Manage and track all your dynamic QR codes
                         </p>
                     </div>
-                    <Button render={<Link href="/dashboard/create" />}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create QR Code
+                    <Button asChild>
+                        <Link href="/dashboard/create">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create QR Code
+                        </Link>
                     </Button>
                 </div>
 
-                <div className="border-2 border-dashed rounded-lg p-12 text-center">
-                    <div className="h-12 w-12 rounded-lg bg-muted flex items-center justify-center mx-auto mb-4">
-                        <QrCode className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                    <h3 className="text-lg font-semibold mb-1">No QR codes yet</h3>
-                    <p className="text-sm text-muted-foreground mb-4">
-                        Create your first dynamic QR code to get started.
-                    </p>
-                    <Button render={<Link href="/dashboard/create" />}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Create your first QR code
-                    </Button>
-                </div>
+                <EmptyState
+                    icon={QrCode}
+                    title="No QR codes yet"
+                    description="Create your first dynamic QR code to get started. You can change the destination anytime without reprinting."
+                    actionLabel="Create your first QR code"
+                    actionHref="/dashboard/create"
+                    secondaryActionLabel="Browse templates"
+                    secondaryActionHref="/dashboard/templates"
+                />
             </div>
         )
     }
@@ -323,9 +334,11 @@ export function QrDashboardClient({ qrCodes, appUrl }: QrDashboardClientProps) {
                         and track all your dynamic QR codes
                     </p>
                 </div>
-                <Button render={<Link href="/dashboard/create" />}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create QR Code
+                <Button asChild>
+                    <Link href="/dashboard/create">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Create QR Code
+                    </Link>
                 </Button>
             </div>
 

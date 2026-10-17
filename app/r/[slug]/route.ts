@@ -1,12 +1,21 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { ratelimit, getClientIp } from '@/lib/ratelimit'
 import { UAParser } from 'ua-parser-js'
 
-// Force dynamic rendering — never cache redirect responses
-// export const dynamic = 'force-dynamic'
-// export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
+/**
+ * GET /r/[slug]
+ *
+ * Handles both:
+ *   - Main domain: scanflow.app/r/abc123
+ *   - Custom domain: go.myrestaurant.com/r/abc123
+ *
+ * Looks up the QR code by slug. If the incoming host is a verified custom
+ * domain, validates that the QR's workspace owns that domain.
+ */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
@@ -14,14 +23,13 @@ export async function GET(
   const startTime = Date.now()
 
   try {
-    // 1. Extract slug
     const { slug } = await params
 
     if (!slug || !/^[A-Za-z0-9_-]{4,32}$/.test(slug)) {
       return redirectToNotFound(request)
     }
 
-    // 2. Rate limiting (100 req/min per IP)
+    // 1. Rate limiting per IP
     const ip = getClientIp(request)
     const { success, limit, remaining, reset } = await ratelimit.limit(ip)
 
@@ -36,17 +44,26 @@ export async function GET(
       })
     }
 
-    // 3. Look up QR code in DB (uses anon client — RLS allows public SELECT of active codes via service role fallback below)
-    const supabase = await createClient()
+    // 2. Detect custom domain from Host header
+    const host =
+      request.headers.get('x-forwarded-host') ||
+      request.headers.get('host') ||
+      ''
+    const hostname = host.split(':')[0].toLowerCase()
 
-    // We need to bypass RLS for this lookup because the visitor isn't authenticated.
-    // Use admin client for the read, but ONLY select public-safe fields.
-    const { createAdminClient } = await import('@/lib/supabase/admin')
+    const appHost = new URL(
+      process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    ).hostname.toLowerCase()
+    const isCustomDomain = hostname !== appHost && hostname !== 'localhost'
+
     const admin = createAdminClient()
 
+    // 3. Look up QR code
     const { data: qrCode, error: lookupError } = await admin
       .from('qr_codes')
-      .select('id, destination_url, is_active, user_id')
+      .select(
+        'id, destination_url, is_active, user_id, workspace_id, custom_domain_id'
+      )
       .eq('slug', slug)
       .maybeSingle()
 
@@ -55,22 +72,60 @@ export async function GET(
       return redirectToNotFound(request)
     }
 
-    if (!qrCode) {
+    if (!qrCode || !qrCode.is_active) {
       return redirectToNotFound(request)
     }
 
-    if (!qrCode.is_active) {
-      return redirectToNotFound(request)
+    // 4. If custom domain, verify the domain is registered for this QR
+    if (isCustomDomain) {
+      const { data: domainRow } = await admin
+        .from('custom_domains')
+        .select('id, workspace_id, status, domain')
+        .eq('domain', hostname)
+        .maybeSingle()
+
+      if (!domainRow) {
+        console.warn(`[redirect] unknown custom domain: ${hostname}`)
+        return redirectToNotFound(request)
+      }
+
+      if (domainRow.status !== 'verified') {
+        console.warn(
+          `[redirect] domain not verified: ${hostname} (${domainRow.status})`
+        )
+        return redirectToNotFound(request)
+      }
+
+      // Domain must belong to the QR's workspace
+      if (domainRow.workspace_id !== qrCode.workspace_id) {
+        console.warn(
+          `[redirect] domain/workspace mismatch: ${hostname} vs ${qrCode.workspace_id}`
+        )
+        return redirectToNotFound(request)
+      }
+
+      // If QR has a specific custom_domain_id, enforce it
+      if (
+        qrCode.custom_domain_id &&
+        qrCode.custom_domain_id !== domainRow.id
+      ) {
+        console.warn(
+          `[redirect] QR locked to different domain: ${qrCode.custom_domain_id}`
+        )
+        return redirectToNotFound(request)
+      }
     }
 
-    // 4. Record scan (fire-and-forget — do NOT await, do NOT block redirect)
-    recordScan(admin, qrCode.id, request).catch((err) => {
-      console.error('[redirect] scan log error:', err)
-    })
+    // 5. Log scan (fire-and-forget)
+    recordScan(admin, qrCode.id, request, isCustomDomain, hostname).catch(
+      (err) => {
+        console.error('[redirect] scan log error:', err)
+      }
+    )
 
-    // 5. Redirect with proper headers
+    // 6. Redirect
     return NextResponse.redirect(qrCode.destination_url, {
-      status: 302, // Temporary — destinations must remain editable
+      status: 302,
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
         'X-Robots-Tag': 'noindex, nofollow',
@@ -83,23 +138,19 @@ export async function GET(
   }
 }
 
-/**
- * Log a scan event without blocking the redirect.
- * Uses fire-and-forget pattern.
- */
 async function recordScan(
   admin: ReturnType<typeof import('@/lib/supabase/admin').createAdminClient>,
   qrCodeId: string,
-  request: NextRequest
+  request: NextRequest,
+  isCustomDomain: boolean,
+  hostname: string
 ) {
   const userAgent = request.headers.get('user-agent') || ''
   const parser = new UAParser(userAgent)
-
   const deviceType =
-    parser.getDevice().type || // 'mobile', 'tablet', 'smarttv', etc.
+    parser.getDevice().type ||
     (parser.getOS().name ? 'desktop' : 'unknown')
 
-  // Vercel provides these headers automatically
   const countryCode =
     request.headers.get('x-vercel-ip-country') ||
     request.headers.get('cf-ipcountry') ||
@@ -123,9 +174,6 @@ async function recordScan(
   })
 }
 
-/**
- * Redirect to the "not found" page instead of showing a raw 404.
- */
 function redirectToNotFound(request: NextRequest) {
   const url = new URL('/r/not-found', request.url)
   return NextResponse.redirect(url, 302)

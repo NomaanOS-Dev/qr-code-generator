@@ -188,7 +188,7 @@ export function LogoUpload({
                 min={10}
                 max={30}
                 step={1}
-                onValueChange={(v) => onSizeChange(v[0])}
+                onValueChange={(v) => onSizeChange(Array.isArray(v) ? v[0] : v)}
               />
               <div className="flex justify-between text-xs text-muted-foreground">
                 <span>10% (safe)</span>

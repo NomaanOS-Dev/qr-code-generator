@@ -21,15 +21,20 @@ import {
   Menu,
   LayoutTemplate,
   Search,
+  Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SignOutButton } from '@/components/auth/signout-button'
+import { WorkspaceSwitcher } from './workspace-switcher'
 import type { User } from '@supabase/supabase-js'
+import type { WorkspaceWithMembership } from '@/types/workspaces'
 
 interface HeaderProps {
   user: User
   profile: { full_name: string | null; email: string } | null
   plan: string
+  workspaces?: WorkspaceWithMembership[]
+  activeWorkspaceId?: string | null
 }
 
 const navigation = [
@@ -37,25 +42,34 @@ const navigation = [
   { name: 'Create QR', href: '/dashboard/create', icon: Plus },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Templates', href: '/dashboard/templates', icon: LayoutTemplate },
+  { name: 'Team', href: '/dashboard/team', icon: Users },
   { name: 'Domains', href: '/dashboard/domains', icon: Globe },
   { name: 'Billing', href: '/dashboard/billing', icon: CreditCard },
 ]
 
-export function DashboardHeader({ user, profile, plan }: HeaderProps) {
+export function DashboardHeader({
+  user,
+  profile,
+  plan,
+  workspaces = [],
+  activeWorkspaceId = null,
+}: HeaderProps) {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
 
   return (
     <header className="h-16 border-b bg-background flex items-center justify-between px-4 md:px-6 sticky top-0 z-30">
-      {/* Mobile menu */}
       <div className="md:hidden">
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger render={<Link href="/dashboard/create" />}>
-            <Button variant="ghost" size="icon">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0">
+          {/* Base UI SheetTrigger — uses `render`, NOT `asChild` */}
+          <SheetTrigger
+            render={
+              <Button variant="ghost" size="icon" aria-label="Open menu">
+                <Menu className="h-5 w-5" />
+              </Button>
+            }
+          />
+          <SheetContent side="left" className="w-72 p-0">
             <SheetHeader className="p-6 border-b">
               <SheetTitle className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
@@ -64,10 +78,16 @@ export function DashboardHeader({ user, profile, plan }: HeaderProps) {
                 ScanFlow
               </SheetTitle>
             </SheetHeader>
-            <div className="p-4">
+            <div className="p-4 space-y-3">
+              {workspaces.length > 0 && (
+                <WorkspaceSwitcher
+                  workspaces={workspaces}
+                  activeId={activeWorkspaceId}
+                />
+              )}
               <Badge
                 variant={plan === 'free' ? 'secondary' : 'default'}
-                className="w-full justify-center py-1 capitalize mb-4"
+                className="w-full justify-center py-1 capitalize"
               >
                 {plan} plan
               </Badge>
@@ -96,7 +116,7 @@ export function DashboardHeader({ user, profile, plan }: HeaderProps) {
                   )
                 })}
               </nav>
-              <div className="mt-4 pt-4 border-t">
+              <div className="pt-4 border-t">
                 <SignOutButton />
               </div>
             </div>
@@ -104,7 +124,6 @@ export function DashboardHeader({ user, profile, plan }: HeaderProps) {
         </Sheet>
       </div>
 
-      {/* Search (desktop) */}
       <div className="hidden md:flex flex-1 max-w-md">
         <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -116,9 +135,8 @@ export function DashboardHeader({ user, profile, plan }: HeaderProps) {
         </div>
       </div>
 
-      {/* Right side */}
       <div className="flex items-center gap-2 ml-auto">
-        <Button render={<Link href="/dashboard/create" />} size="sm">
+        <Button asChild size="sm">
           <Link href="/dashboard/create">
             <Plus className="h-4 w-4 mr-1" />
             Create QR

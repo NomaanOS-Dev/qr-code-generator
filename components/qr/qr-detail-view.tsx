@@ -5,8 +5,13 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { QRCodeSVG } from 'qrcode.react'
 import { formatDistanceToNow } from 'date-fns'
-import { downloadPng, downloadSvg, safeFilename } from '@/lib/qr-download'
-import { updateQrCode, deleteQrCode, toggleQrCodeActive } from '@/app/actions/qr'
+import { safeFilename } from '@/lib/qr-download'
+import {
+    updateQrCode,
+    deleteQrCode,
+    toggleQrCodeActive,
+} from '@/app/actions/qr'
+import { assignDomainToQr } from '@/app/actions/domains'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,6 +23,13 @@ import {
     CardTitle,
 } from '@/components/ui/card'
 import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -26,10 +38,10 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog'
+import { DownloadMenu } from './download-menu'
 import { toast } from 'sonner'
 import {
     ArrowLeft,
-    Download,
     Copy,
     ExternalLink,
     Trash2,
@@ -38,30 +50,42 @@ import {
     X,
     Loader2,
     BarChart3,
+    Globe,
 } from 'lucide-react'
-import { DownloadMenu } from './download-menu'
 
 interface QrDetailViewProps {
-  qrCode: {
-    id: string
-    name: string
-    slug: string
-    destination_url: string
-    foreground_color: string
-    background_color: string
-    logo_path: string | null
-    is_active: boolean
-    created_at: string
-    scanCount: number
-    margin?: number
-    error_correction?: string
-    logo_size_percent?: number
-    style?: string
-  }
-  appUrl: string
+    qrCode: {
+        id: string
+        name: string
+        slug: string
+        destination_url: string
+        foreground_color: string | null
+        background_color: string | null
+        logo_path: string | null
+        is_active: boolean | null
+        created_at: string
+        scanCount: number
+        margin?: number | null
+        error_correction?: string | null
+        logo_size_percent?: number | null
+        style?: string | null
+        custom_domain_id?: string | null
+    }
+    appUrl: string
+    domains?: Array<{
+        id: string
+        domain: string
+        status: string
+    }>
+    baseDomain?: string | null
 }
 
-export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
+export function QrDetailView({
+    qrCode,
+    appUrl,
+    domains = [],
+    baseDomain = null,
+}: QrDetailViewProps) {
     const router = useRouter()
     const previewRef = useRef<SVGSVGElement>(null)
 
@@ -71,31 +95,33 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
     const [isSaving, startSave] = useTransition()
     const [isToggling, startToggle] = useTransition()
     const [isDeleting, startDelete] = useTransition()
+    const [isAssigning, startAssign] = useTransition()
     const [deleteOpen, setDeleteOpen] = useState(false)
 
-    const shortUrl = `${appUrl}/r/${qrCode.slug}`
+    // Normalize nullable DB values
+    const foregroundColor = qrCode.foreground_color ?? '#000000'
+    const backgroundColor = qrCode.background_color ?? '#FFFFFF'
+    const margin = qrCode.margin ?? 4
+    const errorCorrection = (qrCode.error_correction ?? 'H') as
+        | 'L'
+        | 'M'
+        | 'Q'
+        | 'H'
+    const logoSizePercent = qrCode.logo_size_percent ?? 20
+    const isActive = qrCode.is_active ?? true
+
+    // Domain-aware short URL
+    const activeDomain = domains.find((d) => d.id === qrCode.custom_domain_id)
+    const effectiveDomain = activeDomain?.domain ?? baseDomain
+    const shortUrl = effectiveDomain
+        ? `https://${effectiveDomain}/r/${qrCode.slug}`
+        : `${appUrl}/r/${qrCode.slug}`
+
     const filename = safeFilename(qrCode.name)
 
     async function handleCopy() {
         await navigator.clipboard.writeText(shortUrl)
         toast.success('Link copied to clipboard')
-    }
-
-    function handleDownloadPng() {
-        if (!previewRef.current) return
-        downloadPng(previewRef.current, filename, 1024)
-            .then(() => toast.success('PNG downloaded'))
-            .catch((err) => toast.error(err.message))
-    }
-
-    function handleDownloadSvg() {
-        if (!previewRef.current) return
-        try {
-            downloadSvg(previewRef.current, filename)
-            toast.success('SVG downloaded')
-        } catch (err) {
-            toast.error((err as Error).message)
-        }
     }
 
     function handleSave() {
@@ -129,12 +155,12 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
 
     function handleToggle() {
         startToggle(async () => {
-            const result = await toggleQrCodeActive(qrCode.id, !qrCode.is_active)
+            const result = await toggleQrCodeActive(qrCode.id, !isActive)
             if (result.error) {
                 toast.error(result.error)
                 return
             }
-            toast.success(qrCode.is_active ? 'QR code deactivated' : 'QR code activated')
+            toast.success(isActive ? 'QR code deactivated' : 'QR code activated')
             router.refresh()
         })
     }
@@ -151,27 +177,51 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
         })
     }
 
+    // Base UI Select passes `string | null`; normalize before assigning
+    function handleAssignDomain(domainId: string | null) {
+        startAssign(async () => {
+            const value = !domainId || domainId === 'none' ? null : domainId
+            const result = await assignDomainToQr(qrCode.id, value)
+            if (result.error) {
+                toast.error(result.error)
+                return
+            }
+            toast.success('Domain updated')
+            router.refresh()
+        })
+    }
+
+    const logoPixels = Math.round((256 * logoSizePercent) / 100)
+    const verifiedDomains = domains.filter((d) => d.status === 'verified')
+
     return (
         <div className="max-w-5xl mx-auto space-y-6">
             {/* Header */}
             <div className="flex items-center gap-3 flex-wrap">
-                <Button variant="ghost" size="icon" render={<Link href="/dashboard" />}>
-                    <ArrowLeft className="h-4 w-4" />
+                <Button variant="ghost" size="icon" asChild>
+                    <Link href="/dashboard">
+                        <ArrowLeft className="h-4 w-4" />
+                    </Link>
                 </Button>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                         <h1 className="text-3xl font-bold truncate">{qrCode.name}</h1>
-                        <Badge variant={qrCode.is_active ? 'default' : 'secondary'}>
-                            {qrCode.is_active ? 'Active' : 'Inactive'}
+                        <Badge variant={isActive ? 'default' : 'secondary'}>
+                            {isActive ? 'Active' : 'Inactive'}
                         </Badge>
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">
-                        Created {formatDistanceToNow(new Date(qrCode.created_at), { addSuffix: true })}
+                        Created{' '}
+                        {formatDistanceToNow(new Date(qrCode.created_at), {
+                            addSuffix: true,
+                        })}
                     </p>
                 </div>
-                <Button variant="outline" render={<Link href={`/dashboard/${qrCode.id}/analytics`} />}>
-                    <BarChart3 className="h-4 w-4 mr-2" />
-                    Analytics
+                <Button variant="outline" asChild>
+                    <Link href={`/dashboard/${qrCode.id}/analytics`}>
+                        <BarChart3 className="h-4 w-4 mr-2" />
+                        Analytics
+                    </Link>
                 </Button>
             </div>
 
@@ -187,16 +237,16 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
                                 ref={previewRef}
                                 value={shortUrl}
                                 size={256}
-                                fgColor={qrCode.foreground_color}
-                                bgColor={qrCode.background_color}
-                                level={(qrCode as any).error_correction ?? 'H'}
-                                marginSize={(qrCode as any).margin ?? 4}
+                                fgColor={foregroundColor}
+                                bgColor={backgroundColor}
+                                level={errorCorrection}
+                                marginSize={margin}
                                 imageSettings={
                                     qrCode.logo_path
                                         ? {
                                             src: qrCode.logo_path,
-                                            height: Math.round(256 * (((qrCode as any).logo_size_percent ?? 20) / 100)),
-                                            width: Math.round(256 * (((qrCode as any).logo_size_percent ?? 20) / 100)),
+                                            height: logoPixels,
+                                            width: logoPixels,
                                             excavate: true,
                                         }
                                         : undefined
@@ -216,7 +266,9 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
                         />
 
                         <div className="space-y-2">
-                            <Label className="text-xs text-muted-foreground">Short link</Label>
+                            <Label className="text-xs text-muted-foreground">
+                                Short link
+                            </Label>
                             <div className="flex gap-2">
                                 <Input
                                     value={shortUrl}
@@ -230,7 +282,9 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
                         </div>
 
                         <div className="flex items-center justify-between rounded-md bg-muted px-3 py-2">
-                            <span className="text-sm text-muted-foreground">Total scans</span>
+                            <span className="text-sm text-muted-foreground">
+                                Total scans
+                            </span>
                             <span className="text-lg font-bold">{qrCode.scanCount}</span>
                         </div>
                     </CardContent>
@@ -272,16 +326,12 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
                                             onChange={(e) => setDestinationUrl(e.target.value)}
                                         />
                                         <p className="text-xs text-muted-foreground">
-                                            Changes take effect immediately. The printed QR code stays
-                                            the same.
+                                            Changes take effect immediately. The printed QR code
+                                            stays the same.
                                         </p>
                                     </div>
                                     <div className="flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            onClick={handleSave}
-                                            disabled={isSaving}
-                                        >
+                                        <Button size="sm" onClick={handleSave} disabled={isSaving}>
                                             {isSaving ? (
                                                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                             ) : (
@@ -304,11 +354,15 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
                                 <>
                                     <div className="grid sm:grid-cols-2 gap-4">
                                         <div>
-                                            <p className="text-xs text-muted-foreground mb-1">Name</p>
+                                            <p className="text-xs text-muted-foreground mb-1">
+                                                Name
+                                            </p>
                                             <p className="font-medium">{qrCode.name}</p>
                                         </div>
                                         <div>
-                                            <p className="text-xs text-muted-foreground mb-1">Slug</p>
+                                            <p className="text-xs text-muted-foreground mb-1">
+                                                Slug
+                                            </p>
                                             <p className="font-mono text-sm">{qrCode.slug}</p>
                                         </div>
                                     </div>
@@ -333,6 +387,55 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
                         </CardContent>
                     </Card>
 
+                    {/* Custom domain picker */}
+                    {domains.length > 0 && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-lg flex items-center gap-2">
+                                    <Globe className="h-4 w-4" />
+                                    Custom domain
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <p className="text-sm text-muted-foreground">
+                                    Serve this QR code from your own domain instead of{' '}
+                                    <code className="text-xs">{appUrl.replace(/^https?:\/\//, '')}</code>.
+                                </p>
+                                <Select
+                                    value={qrCode.custom_domain_id ?? 'none'}
+                                    onValueChange={handleAssignDomain}
+                                    disabled={isAssigning || verifiedDomains.length === 0}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="none">
+                                            Default (scanflow)
+                                        </SelectItem>
+                                        {verifiedDomains.map((d) => (
+                                            <SelectItem key={d.id} value={d.id}>
+                                                {d.domain}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {verifiedDomains.length === 0 && (
+                                    <p className="text-xs text-amber-600">
+                                        No verified domains yet. Add one on the{' '}
+                                        <Link
+                                            href="/dashboard/domains"
+                                            className="underline hover:text-amber-700"
+                                        >
+                                            Domains
+                                        </Link>{' '}
+                                        page.
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
+
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-lg">Status</CardTitle>
@@ -341,10 +444,10 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="font-medium">
-                                        {qrCode.is_active ? 'Active' : 'Inactive'}
+                                        {isActive ? 'Active' : 'Inactive'}
                                     </p>
                                     <p className="text-xs text-muted-foreground">
-                                        {qrCode.is_active
+                                        {isActive
                                             ? 'Scans redirect to your destination.'
                                             : 'Scans show a "not available" page.'}
                                     </p>
@@ -358,7 +461,7 @@ export function QrDetailView({ qrCode, appUrl }: QrDetailViewProps) {
                                     {isToggling && (
                                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                                     )}
-                                    {qrCode.is_active ? 'Deactivate' : 'Activate'}
+                                    {isActive ? 'Deactivate' : 'Activate'}
                                 </Button>
                             </div>
                         </CardContent>

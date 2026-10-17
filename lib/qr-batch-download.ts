@@ -9,8 +9,8 @@ interface QrForZip {
   id: string
   name: string
   slug: string
-  foreground_color: string
-  background_color: string
+  foreground_color: string | null
+  background_color: string | null
   logo_path: string | null
   margin: number | null
   error_correction: string | null
@@ -73,19 +73,20 @@ function generateSvgString(
   size: number
 ): string {
   const shortUrl = `${appUrl}/r/${qr.slug}`
+  const fgColor = qr.foreground_color ?? '#000000'
+  const bgColor = qr.background_color ?? '#FFFFFF'
   const errorLevel = (qr.error_correction ?? 'H') as 'L' | 'M' | 'Q' | 'H'
-  const logoPixels = Math.round(
-    (size * (qr.logo_size_percent ?? 20)) / 100
-  )
+  const marginSize = qr.margin ?? 4
+  const logoSizePercent = qr.logo_size_percent ?? 20
+  const logoPixels = Math.round((size * logoSizePercent) / 100)
 
-  // renderToStaticMarkup lets us render a React component to an SVG string
   const element = createElement(QRCodeSVG, {
     value: shortUrl,
     size,
-    fgColor: qr.foreground_color,
-    bgColor: qr.background_color,
+    fgColor,
+    bgColor,
     level: errorLevel,
-    marginSize: qr.margin ?? 4,
+    marginSize,
     imageSettings: qr.logo_path
       ? {
           src: qr.logo_path,
@@ -111,6 +112,7 @@ export async function downloadQrBatchAsZip(
   for (const qr of qrCodes) {
     const baseName = safeFilename(qr.name || qr.slug)
     const size = 1024
+    const bgColor = qr.background_color ?? '#FFFFFF'
 
     // SVG
     const svgString = generateSvgString(qr, appUrl, size)
@@ -118,11 +120,7 @@ export async function downloadQrBatchAsZip(
 
     // PNG
     try {
-      const pngBlob = await svgStringToPngBlob(
-        svgString,
-        size,
-        qr.background_color
-      )
+      const pngBlob = await svgStringToPngBlob(svgString, size, bgColor)
       zip.file(`${baseName}.png`, pngBlob)
     } catch (err) {
       console.error(`Failed to render PNG for ${qr.name}:`, err)

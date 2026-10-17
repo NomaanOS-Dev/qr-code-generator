@@ -14,6 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
+      custom_domains: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          domain: string
+          id: string
+          status: string
+          updated_at: string | null
+          verification_error: string | null
+          verification_token: string
+          verified_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          domain: string
+          id?: string
+          status?: string
+          updated_at?: string | null
+          verification_error?: string | null
+          verification_token: string
+          verified_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          domain?: string
+          id?: string
+          status?: string
+          updated_at?: string | null
+          verification_error?: string | null
+          verification_token?: string
+          verified_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_domains_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_domains_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -40,62 +94,82 @@ export type Database = {
       }
       qr_codes: {
         Row: {
-          background_color: string | null
+          background_color: string
           created_at: string | null
+          custom_domain_id: string | null
           destination_url: string
-          error_correction: string | null
-          foreground_color: string | null
+          error_correction: string
+          foreground_color: string
           id: string
-          is_active: boolean | null
+          is_active: boolean
           logo_path: string | null
-          logo_size_percent: number | null
-          margin: number | null
+          logo_size_percent: number
+          margin: number
           name: string
           size: number | null
           slug: string
-          style: string | null
+          style: string
           user_id: string
+          workspace_id: string | null
         }
         Insert: {
-          background_color?: string | null
+          background_color?: string
           created_at?: string | null
+          custom_domain_id?: string | null
           destination_url: string
-          error_correction?: string | null
-          foreground_color?: string | null
+          error_correction?: string
+          foreground_color?: string
           id?: string
-          is_active?: boolean | null
+          is_active?: boolean
           logo_path?: string | null
-          logo_size_percent?: number | null
-          margin?: number | null
+          logo_size_percent?: number
+          margin?: number
           name: string
           size?: number | null
           slug: string
-          style?: string | null
+          style?: string
           user_id: string
+          workspace_id?: string | null
         }
         Update: {
-          background_color?: string | null
+          background_color?: string
           created_at?: string | null
+          custom_domain_id?: string | null
           destination_url?: string
-          error_correction?: string | null
-          foreground_color?: string | null
+          error_correction?: string
+          foreground_color?: string
           id?: string
-          is_active?: boolean | null
+          is_active?: boolean
           logo_path?: string | null
-          logo_size_percent?: number | null
-          margin?: number | null
+          logo_size_percent?: number
+          margin?: number
           name?: string
           size?: number | null
           slug?: string
-          style?: string | null
+          style?: string
           user_id?: string
+          workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "qr_codes_custom_domain_id_fkey"
+            columns: ["custom_domain_id"]
+            isOneToOne: false
+            referencedRelation: "custom_domains"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "qr_codes_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_codes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
             referencedColumns: ["id"]
           },
         ]
@@ -142,6 +216,9 @@ export type Database = {
           id: string
           plan: string | null
           provider_subscription_id: string | null
+          razorpay_customer_id: string | null
+          razorpay_plan_id: string | null
+          razorpay_subscription_id: string | null
           status: string | null
           user_id: string
         }
@@ -151,6 +228,9 @@ export type Database = {
           id?: string
           plan?: string | null
           provider_subscription_id?: string | null
+          razorpay_customer_id?: string | null
+          razorpay_plan_id?: string | null
+          razorpay_subscription_id?: string | null
           status?: string | null
           user_id: string
         }
@@ -160,6 +240,9 @@ export type Database = {
           id?: string
           plan?: string | null
           provider_subscription_id?: string | null
+          razorpay_customer_id?: string | null
+          razorpay_plan_id?: string | null
+          razorpay_subscription_id?: string | null
           status?: string | null
           user_id?: string
         }
@@ -173,15 +256,199 @@ export type Database = {
           },
         ]
       }
+      workspace_members: {
+        Row: {
+          created_at: string | null
+          id: string
+          invite_expires_at: string | null
+          invite_token: string | null
+          invited_by: string | null
+          invited_email: string | null
+          role: Database["public"]["Enums"]["workspace_role"]
+          status: string
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          invite_expires_at?: string | null
+          invite_token?: string | null
+          invited_by?: string | null
+          invited_email?: string | null
+          role?: Database["public"]["Enums"]["workspace_role"]
+          status?: string
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          invite_expires_at?: string | null
+          invite_token?: string | null
+          invited_by?: string | null
+          invited_email?: string | null
+          role?: Database["public"]["Enums"]["workspace_role"]
+          status?: string
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspace_members_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "workspace_members_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      workspaces: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          owner_id: string
+          slug: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          owner_id: string
+          slug: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          owner_id?: string
+          slug?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workspaces_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_country_breakdown: {
+        Args: {
+          p_days?: number
+          p_limit?: number
+          p_qr_code_id?: string
+          p_user_id: string
+          p_workspace_id?: string
+        }
+        Returns: {
+          country_code: string
+          scans: number
+        }[]
+      }
+      get_device_breakdown: {
+        Args: {
+          p_days?: number
+          p_qr_code_id?: string
+          p_user_id: string
+          p_workspace_id?: string
+        }
+        Returns: {
+          device_type: string
+          scans: number
+        }[]
+      }
+      get_recent_scans: {
+        Args: {
+          p_limit?: number
+          p_qr_code_id?: string
+          p_user_id: string
+          p_workspace_id?: string
+        }
+        Returns: {
+          country_code: string
+          device_type: string
+          id: string
+          qr_code_id: string
+          qr_code_name: string
+          referrer_domain: string
+          scanned_at: string
+        }[]
+      }
+      get_scan_summary: {
+        Args: {
+          p_qr_code_id?: string
+          p_user_id: string
+          p_workspace_id?: string
+        }
+        Returns: {
+          month: number
+          today: number
+          total: number
+          week: number
+        }[]
+      }
+      get_scans_over_time: {
+        Args: {
+          p_days?: number
+          p_granularity?: string
+          p_qr_code_id?: string
+          p_user_id: string
+          p_workspace_id?: string
+        }
+        Returns: {
+          bucket: string
+          scans: number
+        }[]
+      }
+      get_top_qr_codes: {
+        Args: { p_limit?: number; p_user_id: string; p_workspace_id?: string }
+        Returns: {
+          id: string
+          name: string
+          scans: number
+          slug: string
+        }[]
+      }
+      has_workspace_role: {
+        Args: {
+          p_roles: Database["public"]["Enums"]["workspace_role"][]
+          p_user_id?: string
+          p_workspace_id: string
+        }
+        Returns: boolean
+      }
+      is_workspace_member: {
+        Args: { p_user_id?: string; p_workspace_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      workspace_role: "owner" | "admin" | "member" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -308,6 +575,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      workspace_role: ["owner", "admin", "member", "viewer"],
+    },
   },
 } as const
