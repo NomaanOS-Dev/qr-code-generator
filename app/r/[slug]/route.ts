@@ -3,8 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { ratelimit, getClientIp } from '@/lib/ratelimit'
 import { UAParser } from 'ua-parser-js'
 
-// export const dynamic = 'force-dynamic'
-// export const runtime = 'nodejs'
+export const instant = false
 
 /**
  * GET /r/[slug]
