@@ -1,12 +1,24 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { QrCode } from 'lucide-react'
+import { cacheLife } from 'next/cache'
 
-export default function MarketingLayout({
+// 👇 1. Add this cached function outside the component
+async function getCopyrightYear() {
+  'use cache'
+  cacheLife('max') // Tells Next.js to keep this cached for a very long time
+  return new Date().getFullYear()
+}
+
+// 👇 2. Make the layout an async function
+export default async function MarketingLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // 👇 3. Fetch the cached year
+  const year = await getCopyrightYear()
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-40">
@@ -82,8 +94,10 @@ export default function MarketingLayout({
               </ul>
             </div>
           </div>
+          
           <div className="mt-8 pt-6 border-t text-center text-sm text-muted-foreground">
-            © {new Date().getFullYear()} ScanFlow. All rights reserved.
+            {/* 👇 4. Use the cached variable here */}
+            © {year} ScanFlow. All rights reserved.
           </div>
         </div>
       </footer>

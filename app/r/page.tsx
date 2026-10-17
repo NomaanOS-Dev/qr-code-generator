@@ -26,7 +26,7 @@ export default function RedirectIndexPage() {
           </p>
         </div>
 
-        <Button render={<Link href="/dashboard/create" />}>
+        <Button asChild>
           <Link href="/">Go to homepage</Link>
         </Button>
       </div>

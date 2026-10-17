@@ -104,16 +104,19 @@ export function DownloadMenu({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant={variant} size={size} className={className}>
-          {busy ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4 mr-2" />
-          )}
-          Download
-        </Button>
-      </DropdownMenuTrigger>
+      {/* FIXED: Changed asChild to render */}
+      <DropdownMenuTrigger 
+        render={
+          <Button variant={variant} size={size} className={className}>
+            {busy ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            Download
+          </Button>
+        }
+      />
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="text-xs text-muted-foreground">
           PNG (raster)

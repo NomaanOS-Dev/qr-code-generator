@@ -16,10 +16,10 @@ export default function HomePage() {
             <span className="text-lg font-bold">ScanFlow</span>
           </Link>
           <nav className="flex items-center gap-2">
-            <Button variant="ghost" render={<Link href="/dashboard/create" />}>
+            <Button variant="ghost" asChild>
               <Link href="/login">Log in</Link>
             </Button>
-            <Button render={<Link href="/dashboard/create" />}>
+            <Button asChild>
               <Link href="/signup">Get started</Link>
             </Button>
           </nav>
@@ -41,12 +41,12 @@ export default function HomePage() {
             and track every scan — without ever reprinting.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-4">
-            <Button size="lg" render={<Link href="/dashboard/create" />}>
+            <Button size="lg" asChild>
               <Link href="/signup">
                 Start free <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
-            <Button size="lg" variant="outline" render={<Link href="/dashboard/create" />}>
+            <Button size="lg" variant="outline" asChild>
               <Link href="/pricing">See pricing</Link>
             </Button>
           </div>

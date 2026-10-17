@@ -1,14 +1,30 @@
+import { cacheLife } from 'next/cache'
+
 export const metadata = {
   title: 'Terms of Service — ScanFlow',
   description: 'Terms governing your use of ScanFlow.',
 }
 
-export default function TermsPage() {
+// 👇 Cached function for the date
+async function getLastUpdatedDate() {
+  'use cache'
+  cacheLife('max')
+  return new Date().toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+// 👇 Make the component async
+export default async function TermsPage() {
+  const lastUpdated = await getLastUpdatedDate()
+
   return (
     <div className="container mx-auto px-4 py-16 max-w-3xl">
       <h1 className="text-4xl font-bold mb-2">Terms of Service</h1>
       <p className="text-muted-foreground mb-8">
-        Last updated: {new Date().toLocaleDateString()}
+        Last updated: {lastUpdated}
       </p>
 
       <div className="prose prose-sm max-w-none space-y-6 text-muted-foreground">

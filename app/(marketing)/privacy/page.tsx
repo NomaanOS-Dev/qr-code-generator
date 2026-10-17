@@ -1,14 +1,32 @@
+import { cacheLife } from 'next/cache'
+
 export const metadata = {
   title: 'Privacy Policy — ScanFlow',
   description: 'How ScanFlow collects, uses, and protects your data.',
 }
 
-export default function PrivacyPage() {
+// 👇 1. Add this cached function
+async function getLastUpdatedDate() {
+  'use cache'
+  cacheLife('max')
+  return new Date().toLocaleDateString('en-US', {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
+// 👇 2. Make the component async
+export default async function PrivacyPage() {
+  // 👇 3. Fetch the date
+  const lastUpdated = await getLastUpdatedDate()
+
   return (
     <div className="container mx-auto px-4 py-16 max-w-3xl">
       <h1 className="text-4xl font-bold mb-2">Privacy Policy</h1>
       <p className="text-muted-foreground mb-8">
-        Last updated: {new Date().toLocaleDateString()}
+        {/* 👇 4. Use the variable */}
+        Last updated: {lastUpdated}
       </p>
 
       <div className="prose prose-sm max-w-none space-y-6 text-muted-foreground">

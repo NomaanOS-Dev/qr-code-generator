@@ -14,6 +14,9 @@ import { createClient } from '@/lib/supabase/server'
 import { RazorpayCheckoutButton } from '@/components/billing/razorpay-checkout'
 import type { RazorpayPlanKey } from '@/lib/razorpay'
 
+// 👇 ADD THIS LINE to fix the prerender error
+export const instant = false
+
 export const metadata = {
   title: 'Pricing — ScanFlow',
   description:
